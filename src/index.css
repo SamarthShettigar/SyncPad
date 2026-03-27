@@ -1,17 +1,25 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: Arial, sans-serif;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-body {
-  background: #f4f4f4;
-  color: #111;
-}
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
 
-button,
-input,
-textarea {
-  font-family: inherit;
+  body {
+    @apply bg-[#f6f7fb] text-slate-900 antialiased transition-colors duration-300;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  body.dark {
+    @apply bg-[#0b1120] text-slate-100;
+  }
+
+  * {
+    @apply transition-colors duration-300;
+  }
 }

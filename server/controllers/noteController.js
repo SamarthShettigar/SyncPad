@@ -49,6 +49,7 @@ const getNotes = async (req, res) => {
       .populate("owner", "name email")
       .populate("sharedWith", "name email")
       .sort({
+        isPinned: -1,
         updatedAt: -1,
       });
 
@@ -356,7 +357,6 @@ const getNoteVersions = async (req, res) => {
   }
 };
 
-// PUT /api/notes/:noteId/restore/:versionId
 // PUT /api/notes/:noteId/restore/:versionId
 const restoreVersion = async (req, res) => {
   try {

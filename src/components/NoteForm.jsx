@@ -2,6 +2,16 @@ import React, { useEffect, useRef, useState } from "react";
 import socket from "../socket";
 import API from "../api/axios";
 import toast from "react-hot-toast";
+import {
+  Users,
+  PencilLine,
+  History,
+  MessageSquare,
+  Send,
+  X,
+  Save,
+  Tags,
+} from "lucide-react";
 
 function NoteForm({
   title,
@@ -14,7 +24,6 @@ function NoteForm({
   handleSubmit,
   handleCancelEdit,
   user,
-  darkMode = false,
 }) {
   const [collaborators, setCollaborators] = useState(0);
   const [isSomeoneTyping, setIsSomeoneTyping] = useState(false);
@@ -24,7 +33,6 @@ function NoteForm({
 
   const [messages, setMessages] = useState([]);
   const [chatText, setChatText] = useState("");
-
   const [liveCursors, setLiveCursors] = useState({});
 
   const typingTimeoutRef = useRef(null);
@@ -63,6 +71,7 @@ function NoteForm({
         setMessages(res.data);
       } catch (error) {
         console.error("Fetch chat messages error:", error);
+        toast.error("Failed to load chat messages");
       }
     };
 
@@ -94,19 +103,16 @@ function NoteForm({
 
     const handleLiveCursors = (users) => {
       const cursorMap = {};
-
       users.forEach((cursor) => {
         if (cursor.userId !== user._id) {
           cursorMap[cursor.socketId] = cursor;
         }
       });
-
       setLiveCursors(cursorMap);
     };
 
     const handleCursorUpdate = (cursor) => {
       if (cursor.userId === user._id) return;
-
       setLiveCursors((prev) => ({
         ...prev,
         [cursor.socketId]: cursor,
@@ -155,7 +161,6 @@ function NoteForm({
     if (!editingId || !editorWrapperRef.current) return;
 
     const rect = editorWrapperRef.current.getBoundingClientRect();
-
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
@@ -222,6 +227,7 @@ function NoteForm({
   const handleToggleHistory = async () => {
     if (!showHistory && editingId) {
       await fetchVersions();
+      toast.success("Version history loaded");
     }
     setShowHistory((prev) => !prev);
   };
@@ -255,7 +261,15 @@ function NoteForm({
   };
 
   const handleSendMessage = () => {
-    if (!chatText.trim() || !editingId || !user?._id) return;
+    if (!editingId || !user?._id) {
+      toast.error("Open a note to use chat");
+      return;
+    }
+
+    if (!chatText.trim()) {
+      toast.error("Message cannot be empty");
+      return;
+    }
 
     socket.emit("send-message", {
       noteId: editingId,
@@ -290,138 +304,100 @@ function NoteForm({
     setTags("");
 
     handleCancelEdit();
-  };
-
-  const themedStyles = {
-    form: {
-      ...styles.form,
-      background: darkMode ? "#1e293b" : "#fff",
-      border: darkMode ? "1px solid #334155" : "1px solid #ddd",
-      color: darkMode ? "#f8fafc" : "#111827",
-    },
-    infoRow: {
-      ...styles.infoRow,
-      color: darkMode ? "#cbd5e1" : "#555",
-    },
-    input: {
-      ...styles.input,
-      background: darkMode ? "#0f172a" : "#fff",
-      color: darkMode ? "#fff" : "#111",
-      border: darkMode ? "1px solid #475569" : "1px solid #ccc",
-    },
-    textarea: {
-      ...styles.textarea,
-      background: darkMode ? "#0f172a" : "#fff",
-      color: darkMode ? "#fff" : "#111",
-      border: darkMode ? "1px solid #475569" : "1px solid #ccc",
-    },
-    historyBox: {
-      ...styles.historyBox,
-      background: darkMode ? "#0f172a" : "#fafafa",
-      border: darkMode ? "1px solid #334155" : "1px solid #ddd",
-      color: darkMode ? "#f8fafc" : "#111827",
-    },
-    versionItem: {
-      ...styles.versionItem,
-      background: darkMode ? "#1e293b" : "#fff",
-      border: darkMode ? "1px solid #475569" : "1px solid #ddd",
-      color: darkMode ? "#f8fafc" : "#111827",
-    },
-    chatBox: {
-      ...styles.chatBox,
-      background: darkMode ? "#1e293b" : "#fff",
-      border: darkMode ? "1px solid #334155" : "1px solid #ddd",
-      color: darkMode ? "#f8fafc" : "#111827",
-    },
-    messagesContainer: {
-      ...styles.messagesContainer,
-      background: darkMode ? "#0f172a" : "#fafafa",
-      border: darkMode ? "1px solid #334155" : "1px solid #e5e7eb",
-    },
-    noMessages: {
-      ...styles.noMessages,
-      color: darkMode ? "#cbd5e1" : "#666",
-    },
-    chatInput: {
-      ...styles.chatInput,
-      background: darkMode ? "#0f172a" : "#fff",
-      color: darkMode ? "#fff" : "#111",
-      border: darkMode ? "1px solid #475569" : "1px solid #ccc",
-    },
-    messageTime: {
-      ...styles.messageTime,
-      color: darkMode ? "#cbd5e1" : "#666",
-    },
+    toast.success("Editing cancelled");
   };
 
   return (
     <div
-      style={{
-        ...styles.wrapper,
-        gridTemplateColumns: editingId ? "2fr 1fr" : "1fr",
-      }}
+      className={`grid gap-6 ${editingId ? "xl:grid-cols-[1.7fr_1fr]" : "grid-cols-1"}`}
     >
-      <form onSubmit={handleSubmit} style={themedStyles.form}>
-        <h2>{editingId ? "Edit Note" : "Create Note"}</h2>
-
-        {editingId && (
-          <div style={themedStyles.infoRow}>
-            <span>👥 Collaborators: {collaborators}</span>
-            {isSomeoneTyping && <span>✍️ Someone is typing...</span>}
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-[30px] border border-white/70 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.08)] sm:p-7"
+      >
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-indigo-600">
+              {editingId ? "Editing mode" : "New note"}
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              {editingId ? "Edit Note" : "Create Note"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Write, organize, collaborate, and save everything in one workspace.
+            </p>
           </div>
-        )}
+
+          {editingId && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700">
+                <Users size={14} />
+                {collaborators} collaborator{collaborators !== 1 ? "s" : ""}
+              </span>
+
+              {isSomeoneTyping && (
+                <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  <PencilLine size={14} />
+                  Someone is typing...
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
         <div
           ref={editorWrapperRef}
-          style={styles.editorWrapper}
           onMouseMove={handleMouseMove}
+          className="relative mt-6 space-y-4"
         >
           <input
             type="text"
             placeholder="Enter note title"
             value={title}
             onChange={handleTitleChange}
-            style={themedStyles.input}
             required
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base font-medium text-slate-900 outline-none transition duration-300 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
           />
 
-          <input
-            type="text"
-            placeholder="Enter tags separated by commas (example: work, urgent, project)"
-            value={tags}
-            onChange={handleTagsChange}
-            style={themedStyles.input}
-          />
+          <div className="relative">
+            <Tags
+              size={16}
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Enter tags separated by commas (example: work, urgent, project)"
+              value={tags}
+              onChange={handleTagsChange}
+              className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none transition duration-300 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+            />
+          </div>
 
           <textarea
             placeholder="Write your note..."
             value={content}
             onChange={handleContentChange}
-            rows="8"
-            style={themedStyles.textarea}
+            rows="10"
             required
+            className="min-h-[280px] w-full resize-y rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-900 outline-none transition duration-300 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
           />
 
           {Object.values(liveCursors).map((cursor) => (
             <div
               key={cursor.socketId}
+              className="pointer-events-none absolute z-10"
               style={{
-                ...styles.cursorContainer,
                 left: `${cursor.x}px`,
                 top: `${cursor.y}px`,
               }}
             >
               <div
-                style={{
-                  ...styles.cursorPointer,
-                  backgroundColor: cursor.color,
-                }}
+                className="h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm"
+                style={{ backgroundColor: cursor.color }}
               />
               <div
-                style={{
-                  ...styles.cursorLabel,
-                  backgroundColor: cursor.color,
-                }}
+                className="mt-1 inline-block rounded-md px-2 py-1 text-[11px] font-semibold text-white shadow-sm"
+                style={{ backgroundColor: cursor.color }}
               >
                 {cursor.userName}
               </div>
@@ -429,8 +405,12 @@ function NoteForm({
           ))}
         </div>
 
-        <div style={styles.buttonRow}>
-          <button type="submit" style={styles.button}>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(79,70,229,0.28)] transition duration-300 hover:scale-[1.02]"
+          >
+            <Save size={16} />
             {editingId ? "Update Note" : "Add Note"}
           </button>
 
@@ -439,16 +419,18 @@ function NoteForm({
               <button
                 type="button"
                 onClick={handleCancel}
-                style={styles.cancelButton}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition duration-300 hover:bg-slate-50"
               >
+                <X size={16} />
                 Cancel
               </button>
 
               <button
                 type="button"
                 onClick={handleToggleHistory}
-                style={styles.historyButton}
+                className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3 text-sm font-semibold text-violet-700 transition duration-300 hover:bg-violet-100"
               >
+                <History size={16} />
                 {showHistory ? "Hide History" : "View History"}
               </button>
             </>
@@ -456,271 +438,122 @@ function NoteForm({
         </div>
 
         {showHistory && (
-          <div style={themedStyles.historyBox}>
-            <h3>Version History</h3>
+          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <History size={18} className="text-violet-600" />
+              <h3 className="text-lg font-semibold text-slate-900">
+                Version History
+              </h3>
+            </div>
 
             {loadingHistory ? (
-              <p>Loading history...</p>
+              <p className="text-sm text-slate-500">Loading history...</p>
             ) : versions.length === 0 ? (
-              <p>No versions found.</p>
+              <p className="text-sm text-slate-500">No versions found.</p>
             ) : (
-              versions.map((version) => (
-                <div key={version._id} style={themedStyles.versionItem}>
-                  <p>
-                    <strong>Title:</strong> {version.title}
-                  </p>
-                  <p>
-                    <strong>Tags:</strong>{" "}
-                    {version.tags?.length ? version.tags.join(", ") : "No tags"}
-                  </p>
-                  <p>
-                    <strong>Content:</strong> {version.content}
-                  </p>
-                  <p>
-                    <strong>Saved At:</strong>{" "}
-                    {new Date(version.editedAt).toLocaleString()}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleRestoreVersion(version._id)}
-                    style={styles.restoreButton}
+              <div className="space-y-3">
+                {versions.map((version) => (
+                  <div
+                    key={version._id}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                   >
-                    Restore
-                  </button>
-                </div>
-              ))
+                    <p className="text-sm text-slate-700">
+                      <strong>Title:</strong> {version.title}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      <strong>Tags:</strong>{" "}
+                      {version.tags?.length ? version.tags.join(", ") : "No tags"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      <strong>Content:</strong> {version.content}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      <strong>Saved At:</strong>{" "}
+                      {new Date(version.editedAt).toLocaleString()}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreVersion(version._id)}
+                      className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
       </form>
 
       {editingId && (
-        <div style={themedStyles.chatBox}>
-          <h3>💬 Note Chat</h3>
-
-          <div style={themedStyles.messagesContainer}>
-            {messages.length === 0 ? (
-              <p style={themedStyles.noMessages}>No messages yet</p>
-            ) : (
-              messages.map((msg) => {
-                const senderId =
-                  typeof msg.sender === "object" ? msg.sender?._id : msg.sender;
-
-                const isOwn = senderId === user?._id;
-
-                return (
-                  <div
-                    key={msg._id}
-                    style={{
-                      ...styles.messageItem,
-                      alignSelf: isOwn ? "flex-end" : "flex-start",
-                      backgroundColor: isOwn
-                        ? darkMode
-                          ? "#1d4ed8"
-                          : "#dbeafe"
-                        : darkMode
-                          ? "#334155"
-                          : "#f3f4f6",
-                      color: darkMode ? "#fff" : "#111",
-                    }}
-                  >
-                    <div style={styles.messageHeader}>
-                      <strong>{msg.senderName}</strong>
-                    </div>
-
-                    <div>{msg.text}</div>
-
-                    <small style={themedStyles.messageTime}>
-                      {new Date(msg.createdAt).toLocaleTimeString()}
-                    </small>
-                  </div>
-                );
-              })
-            )}
-
-            <div ref={messagesEndRef} />
+        <div className="rounded-[30px] border border-white/70 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-4">
+            <MessageSquare size={18} className="text-indigo-600" />
+            <h3 className="text-xl font-semibold text-slate-950">Note Chat</h3>
           </div>
 
-          <div style={styles.chatInputRow}>
-            <input
-              type="text"
-              placeholder="Type a message..."
-              value={chatText}
-              onChange={(e) => setChatText(e.target.value)}
-              onKeyDown={handleChatKeyDown}
-              style={themedStyles.chatInput}
-            />
+          <div className="mt-4 flex h-[420px] flex-col rounded-[24px] border border-slate-200 bg-slate-50 p-3">
+            <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+              {messages.length === 0 ? (
+                <p className="pt-10 text-center text-sm text-slate-500">
+                  No messages yet
+                </p>
+              ) : (
+                messages.map((msg) => {
+                  const senderId =
+                    typeof msg.sender === "object" ? msg.sender?._id : msg.sender;
 
-            <button
-              type="button"
-              onClick={handleSendMessage}
-              style={styles.sendButton}
-            >
-              Send
-            </button>
+                  const isOwn = senderId === user?._id;
+
+                  return (
+                    <div
+                      key={msg._id}
+                      className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                        isOwn
+                          ? "ml-auto bg-indigo-100 text-slate-900"
+                          : "bg-white text-slate-900"
+                      }`}
+                    >
+                      <div className="mb-1 text-xs font-semibold text-slate-600">
+                        {msg.senderName}
+                      </div>
+                      <div className="leading-6">{msg.text}</div>
+                      <small className="mt-2 block text-[11px] text-slate-400">
+                        {new Date(msg.createdAt).toLocaleTimeString()}
+                      </small>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <input
+                type="text"
+                placeholder="Type a message..."
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                onKeyDown={handleChatKeyDown}
+                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition duration-300 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              />
+
+              <button
+                type="button"
+                onClick={handleSendMessage}
+                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+              >
+                <Send size={16} />
+                Send
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-const styles = {
-  wrapper: {
-    display: "grid",
-    gap: "20px",
-    alignItems: "start",
-  },
-  form: {
-    padding: "20px",
-    borderRadius: "10px",
-  },
-  editorWrapper: {
-    position: "relative",
-  },
-  infoRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: "12px",
-    fontSize: "14px",
-    flexWrap: "wrap",
-    gap: "8px",
-  },
-  input: {
-    width: "100%",
-    padding: "10px",
-    marginBottom: "12px",
-    borderRadius: "8px",
-    boxSizing: "border-box",
-  },
-  textarea: {
-    width: "100%",
-    padding: "10px",
-    borderRadius: "8px",
-    resize: "vertical",
-    marginBottom: "12px",
-    boxSizing: "border-box",
-  },
-  buttonRow: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-  },
-  button: {
-    padding: "10px 16px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#2563eb",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  cancelButton: {
-    padding: "10px 16px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#6b7280",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  historyButton: {
-    padding: "10px 16px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#7c3aed",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  historyBox: {
-    marginTop: "20px",
-    padding: "15px",
-    borderRadius: "8px",
-  },
-  versionItem: {
-    borderRadius: "8px",
-    padding: "10px",
-    marginBottom: "10px",
-    wordBreak: "break-word",
-  },
-  restoreButton: {
-    padding: "8px 12px",
-    border: "none",
-    borderRadius: "6px",
-    background: "#16a34a",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  cursorContainer: {
-    position: "absolute",
-    pointerEvents: "none",
-    zIndex: 10,
-  },
-  cursorPointer: {
-    width: "14px",
-    height: "14px",
-    borderRadius: "50%",
-    border: "2px solid white",
-    boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
-  },
-  cursorLabel: {
-    marginTop: "4px",
-    padding: "2px 6px",
-    borderRadius: "6px",
-    color: "#fff",
-    fontSize: "12px",
-    whiteSpace: "nowrap",
-    display: "inline-block",
-  },
-  chatBox: {
-    padding: "20px",
-    borderRadius: "10px",
-    display: "flex",
-    flexDirection: "column",
-    minHeight: "500px",
-  },
-  messagesContainer: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    overflowY: "auto",
-    borderRadius: "8px",
-    padding: "10px",
-    marginBottom: "12px",
-    maxHeight: "400px",
-  },
-  noMessages: {
-    textAlign: "center",
-  },
-  messageItem: {
-    maxWidth: "80%",
-    padding: "10px",
-    borderRadius: "10px",
-    wordBreak: "break-word",
-  },
-  messageHeader: {
-    marginBottom: "4px",
-  },
-  messageTime: {
-    display: "block",
-    marginTop: "6px",
-  },
-  chatInputRow: {
-    display: "flex",
-    gap: "10px",
-  },
-  chatInput: {
-    flex: 1,
-    padding: "10px",
-    borderRadius: "8px",
-  },
-  sendButton: {
-    padding: "10px 16px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#059669",
-    color: "#fff",
-    cursor: "pointer",
-  },
-};
 
 export default NoteForm;

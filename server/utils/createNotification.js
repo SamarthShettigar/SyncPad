@@ -1,26 +1,23 @@
 const Notification = require("../models/Notification");
 
 const createNotification = async ({
+  user,
   recipient,
-  sender,
-  senderName,
-  note,
+  sender = null,
+  note = null,
   type,
   message,
 }) => {
   try {
-    if (!recipient || !sender || !senderName || !note || !type || !message) {
-      return null;
-    }
+    const targetUser = user || recipient;
 
-    if (recipient.toString() === sender.toString()) {
+    if (!targetUser || !type || !message) {
       return null;
     }
 
     const notification = await Notification.create({
-      recipient,
+      user: targetUser,
       sender,
-      senderName,
       note,
       type,
       message,

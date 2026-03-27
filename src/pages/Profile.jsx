@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { User, Mail, Moon, Sun, LogOut, Save, Shield } from "lucide-react";
+import { User, Mail, Moon, Sun, LogOut, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import AppShell from "../components/layout/AppShell";
 
-function Settings() {
+function Profile() {
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,7 +18,6 @@ function Settings() {
     } else {
       document.documentElement.classList.remove("dark");
     }
-
     localStorage.setItem("theme", theme);
   }, [theme]);
 
@@ -31,9 +30,9 @@ function Settings() {
     }
 
     localStorage.setItem("userName", name.trim());
-    toast.success("Settings saved successfully");
+    toast.success("Profile updated successfully");
 
-    window.dispatchEvent(new Event("syncpad-user-updated"));
+    window.dispatchEvent(new Event("storage"));
   };
 
   const handleLogout = () => {
@@ -48,8 +47,8 @@ function Settings() {
 
   return (
     <AppShell
-      title="Settings"
-      subtitle="Manage your profile and preferences"
+      title="Profile & Settings"
+      subtitle="Manage your account preferences"
       onNewNote={() => navigate("/dashboard?create=true")}
       searchTerm={searchTerm}
       setSearchTerm={setSearchTerm}
@@ -63,10 +62,10 @@ function Settings() {
 
             <div>
               <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">
-                Account Settings
+                Your Profile
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Update your account details and personalize your workspace
+                Update your personal information and preferences
               </p>
             </div>
           </div>
@@ -99,16 +98,6 @@ function Settings() {
               />
             </div>
 
-            <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                <Shield size={16} />
-                Account Status
-              </label>
-              <div className="flex h-12 items-center rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                Active account
-              </div>
-            </div>
-
             <div className="pt-2">
               <button
                 type="submit"
@@ -127,7 +116,7 @@ function Settings() {
               Appearance
             </h3>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Choose the look and feel of SyncPad
+              Choose how SyncPad looks for you
             </p>
 
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -167,10 +156,10 @@ function Settings() {
 
           <div className="rounded-[30px] border border-red-200 bg-white/80 p-6 shadow-[0_14px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-red-500/20 dark:bg-[#0f172a]/80">
             <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-              Session
+              Account Actions
             </h3>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Sign out from your current account safely
+              Sign out from your current session
             </p>
 
             <button
@@ -188,4 +177,4 @@ function Settings() {
   );
 }
 
-export default Settings;
+export default Profile;

@@ -3,8 +3,10 @@ const Notification = require("../models/Notification");
 const getNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({
-      recipient: req.user.id,
+      user: req.user.id,
     })
+      .populate("sender", "name email")
+      .populate("note", "title")
       .sort({ createdAt: -1 })
       .limit(50);
 
@@ -23,7 +25,7 @@ const markNotificationAsRead = async (req, res) => {
       return res.status(404).json({ message: "Notification not found" });
     }
 
-    if (notification.recipient.toString() !== req.user.id) {
+    if (notification.user.toString() !== req.user.id) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -40,7 +42,7 @@ const markNotificationAsRead = async (req, res) => {
 const markAllNotificationsAsRead = async (req, res) => {
   try {
     await Notification.updateMany(
-      { recipient: req.user.id, isRead: false },
+      { user: req.user.id, isRead: false },
       { $set: { isRead: true } },
     );
 

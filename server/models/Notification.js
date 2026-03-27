@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
   {
-    recipient: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -10,16 +10,12 @@ const notificationSchema = new mongoose.Schema(
     sender: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
-    },
-    senderName: {
-      type: String,
-      required: true,
+      default: null,
     },
     note: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Note",
-      required: true,
+      default: null,
     },
     type: {
       type: String,

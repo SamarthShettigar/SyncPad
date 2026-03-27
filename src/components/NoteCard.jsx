@@ -1,6 +1,14 @@
 import React, { useState } from "react";
 import API from "../api/axios";
 import toast from "react-hot-toast";
+import {
+  Pin,
+  Share2,
+  Trash2,
+  Pencil,
+  User,
+  Users,
+} from "lucide-react";
 
 function NoteCard({
   note,
@@ -8,7 +16,6 @@ function NoteCard({
   handleDelete,
   currentUserId,
   fetchNotes,
-  darkMode = false,
 }) {
   const ownerId = note.owner?._id || "";
   const ownerEmail = note.owner?.email || "Unknown owner";
@@ -22,26 +29,22 @@ function NoteCard({
 
   const handleShare = async () => {
     if (!shareEmail.trim()) {
-      toast.error("Please enter an email");
+      toast.error("Enter email");
       return;
     }
 
     try {
       setSharing(true);
-
       await API.post(`/notes/${note._id}/share`, {
         email: shareEmail.trim(),
       });
-
-      toast.success("Note shared successfully");
+      toast.success("Shared successfully");
       setShareEmail("");
-
-      if (fetchNotes) {
-        fetchNotes();
-      }
+      fetchNotes && fetchNotes();
     } catch (error) {
-      console.error(error.response?.data?.message || "Failed to share note");
-      toast.error(error.response?.data?.message || "Failed to share note");
+      toast.error(
+        error?.response?.data?.message || "Share failed",
+      );
     } finally {
       setSharing(false);
     }
@@ -51,149 +54,123 @@ function NoteCard({
     try {
       setPinLoading(true);
       await API.put(`/notes/${note._id}/pin`);
-
-      toast.success(
-        note.isPinned ? "Note unpinned successfully" : "Note pinned successfully",
-      );
-
-      if (fetchNotes) {
-        fetchNotes();
-      }
+      toast.success(note.isPinned ? "Note unpinned" : "Note pinned");
+      fetchNotes && fetchNotes();
     } catch (error) {
-      console.error(error.response?.data?.message || "Failed to update pin");
-      toast.error(error.response?.data?.message || "Failed to update pin");
+      toast.error(
+        error?.response?.data?.message || "Pin failed",
+      );
     } finally {
       setPinLoading(false);
     }
   };
 
-  const themedStyles = {
-    card: {
-      ...styles.card,
-      background: darkMode ? "#1e293b" : "#fff",
-      boxShadow: darkMode
-        ? "0 0 10px rgba(0,0,0,0.25)"
-        : "0 0 10px rgba(0,0,0,0.08)",
-      border: note.isPinned
-        ? "2px solid #f59e0b"
-        : darkMode
-          ? "1px solid #334155"
-          : "none",
-    },
-    title: {
-      ...styles.title,
-      color: darkMode ? "#f8fafc" : "#111827",
-    },
-    meta: {
-      ...styles.meta,
-      color: darkMode ? "#cbd5e1" : "#666",
-    },
-    tag: {
-      ...styles.tag,
-      background: darkMode ? "#312e81" : "#eef2ff",
-      color: darkMode ? "#c7d2fe" : "#4338ca",
-    },
-    content: {
-      ...styles.content,
-      color: darkMode ? "#e2e8f0" : "#444",
-    },
-    shareSection: {
-      ...styles.shareSection,
-      background: darkMode ? "#0f172a" : "#f8fafc",
-      border: darkMode ? "1px solid #334155" : "1px solid #e5e7eb",
-    },
-    shareLabel: {
-      ...styles.shareLabel,
-      color: darkMode ? "#f8fafc" : "#333",
-    },
-    shareInput: {
-      ...styles.shareInput,
-      background: darkMode ? "#1e293b" : "#fff",
-      color: darkMode ? "#fff" : "#111",
-      border: darkMode ? "1px solid #475569" : "1px solid #ccc",
-    },
-  };
-
   return (
-    <div style={themedStyles.card}>
-      <div style={styles.topRow}>
-        <div style={styles.titleWrap}>
-          <h3 style={themedStyles.title}>
-            {note.isPinned ? "📌 " : ""}
+    <div
+      className={`group rounded-[28px] border bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:bg-[#1e293b] ${
+        note.isPinned
+          ? "border-yellow-300 ring-1 ring-yellow-200 dark:border-yellow-500/40 dark:ring-yellow-500/20"
+          : "border-gray-200 dark:border-gray-700"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-semibold text-gray-900 dark:text-white">
+            {note.isPinned && "📌 "}
             {note.title || "Untitled Note"}
           </h3>
+
+          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            <User size={14} />
+            {ownerEmail}
+          </div>
         </div>
 
-        <span style={isOwner ? styles.ownerBadge : styles.sharedBadge}>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            isOwner
+              ? "bg-gray-900 text-white"
+              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
+          }`}
+        >
           {isOwner ? "Owner" : "Shared"}
         </span>
       </div>
 
-      <p style={themedStyles.meta}>
-        <strong>Owner:</strong> {ownerEmail}
-      </p>
-
-      <p style={themedStyles.meta}>
-        <strong>Shared with:</strong> {sharedCount} user
-        {sharedCount !== 1 ? "s" : ""}
-      </p>
-
       {note.tags?.length > 0 && (
-        <div style={styles.tagsContainer}>
-          {note.tags.map((tag, index) => (
-            <span key={index} style={themedStyles.tag}>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {note.tags.map((tag, i) => (
+            <span
+              key={i}
+              className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300"
+            >
               #{tag}
             </span>
           ))}
         </div>
       )}
 
-      <p style={themedStyles.content}>{note.content || "No content"}</p>
+      <p className="mt-4 line-clamp-3 text-sm text-gray-600 dark:text-gray-300">
+        {note.content || "No content"}
+      </p>
+
+      <div className="mt-4 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <Users size={14} />
+        {sharedCount} user{sharedCount !== 1 ? "s" : ""}
+      </div>
 
       {isOwner && (
-        <div style={themedStyles.shareSection}>
-          <p style={themedStyles.shareLabel}>Share this note</p>
-
-          <div style={styles.shareRow}>
+        <div className="mt-4 rounded-2xl bg-gray-50 p-3 dark:bg-[#0f172a]">
+          <div className="flex gap-2">
             <input
               type="email"
-              placeholder="Enter user email"
+              placeholder="Share via email"
               value={shareEmail}
               onChange={(e) => setShareEmail(e.target.value)}
-              style={themedStyles.shareInput}
+              className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-gray-700 dark:bg-[#1e293b] dark:text-white"
             />
 
             <button
               onClick={handleShare}
-              style={styles.shareBtn}
               disabled={sharing}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {sharing ? "Sharing..." : "Share"}
+              {sharing ? "..." : <Share2 size={16} />}
             </button>
           </div>
         </div>
       )}
 
-      <div style={styles.buttons}>
-        <button onClick={() => handleEdit(note)} style={styles.editBtn}>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          onClick={() => handleEdit(note)}
+          className="flex items-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700"
+        >
+          <Pencil size={14} />
           Edit
         </button>
 
         {isOwner && (
           <button
             onClick={handleTogglePin}
-            style={note.isPinned ? styles.unpinBtn : styles.pinBtn}
             disabled={pinLoading}
+            className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
+              note.isPinned
+                ? "bg-amber-600 hover:bg-amber-700"
+                : "bg-yellow-500 hover:bg-yellow-600"
+            }`}
           >
-            {pinLoading ? "Please wait..." : note.isPinned ? "Unpin" : "Pin"}
+            <Pin size={14} />
+            {pinLoading ? "..." : note.isPinned ? "Unpin" : "Pin"}
           </button>
         )}
 
         {isOwner && (
           <button
             onClick={() => handleDelete(note._id)}
-            style={styles.deleteBtn}
+            className="flex items-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
           >
+            <Trash2 size={14} />
             Delete
           </button>
         )}
@@ -201,140 +178,5 @@ function NoteCard({
     </div>
   );
 }
-
-const styles = {
-  card: {
-    padding: "20px",
-    borderRadius: "12px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  topRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "10px",
-  },
-  titleWrap: {
-    flex: 1,
-  },
-  title: {
-    marginTop: 0,
-    marginBottom: "4px",
-    fontSize: "18px",
-    wordBreak: "break-word",
-  },
-  ownerBadge: {
-    background: "#111",
-    color: "#fff",
-    padding: "4px 10px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: "600",
-    flexShrink: 0,
-  },
-  sharedBadge: {
-    background: "#dbeafe",
-    color: "#1d4ed8",
-    padding: "4px 10px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: "600",
-    flexShrink: 0,
-  },
-  meta: {
-    margin: 0,
-    fontSize: "13px",
-    wordBreak: "break-word",
-  },
-  tagsContainer: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    marginTop: "6px",
-  },
-  tag: {
-    padding: "4px 10px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: "600",
-  },
-  content: {
-    lineHeight: "1.6",
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-    whiteSpace: "pre-wrap",
-    marginTop: "6px",
-  },
-  shareSection: {
-    marginTop: "12px",
-    padding: "12px",
-    borderRadius: "10px",
-  },
-  shareLabel: {
-    margin: "0 0 8px 0",
-    fontSize: "13px",
-    fontWeight: "600",
-  },
-  shareRow: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-  },
-  shareInput: {
-    flex: 1,
-    minWidth: "180px",
-    padding: "10px 12px",
-    borderRadius: "8px",
-    outline: "none",
-  },
-  shareBtn: {
-    padding: "10px 16px",
-    background: "#2563eb",
-    color: "#fff",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-  buttons: {
-    display: "flex",
-    gap: "10px",
-    marginTop: "16px",
-    flexWrap: "wrap",
-  },
-  editBtn: {
-    padding: "10px 16px",
-    background: "#222",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-  pinBtn: {
-    padding: "10px 16px",
-    background: "#f59e0b",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-  unpinBtn: {
-    padding: "10px 16px",
-    background: "#6b7280",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-  deleteBtn: {
-    padding: "10px 16px",
-    background: "#e11d48",
-    color: "white",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-};
 
 export default NoteCard;

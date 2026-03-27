@@ -5,6 +5,7 @@ const authRoutes = require("./routes/authRoutes");
 const noteRoutes = require("./routes/noteRoutes");
 const chatRoutes = require("./routes/chatRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+
 const app = express();
 
 app.use(
@@ -24,4 +25,5 @@ app.use("/api/auth", authRoutes);
 app.use("/api/notes", noteRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/notifications", notificationRoutes);
+
 module.exports = app;
