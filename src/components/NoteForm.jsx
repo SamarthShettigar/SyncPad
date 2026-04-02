@@ -1,29 +1,30 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import socket from "../socket";
 import API from "../api/axios";
 import toast from "react-hot-toast";
-import {
-  Users,
-  PencilLine,
-  History,
-  MessageSquare,
-  Send,
-  X,
-  Save,
-  Tags,
-} from "lucide-react";
+import NoteEditor from "./NoteEditor";
+import AIAssistant from "./AIAssistant";
+import AISmartBar from "./AISmartBar";
+import AIMetadataBar from "./AIMetadataBar";
+import AIResultPreview from "./AIResultPreview";
+import AITemplateCards from "./AITemplateCards";
+import AISmartActionsPanel from "./AISmartActionsPanel";
+import NoteInsightsPanel from "./NoteInsightsPanel";
+import AICollaborationPanel from "./AICollaborationPanel";
+import AIFloatingButton from "./AIFloatingButton";
+import AIDrawer from "./AIDrawer";
 
 function NoteForm({
   title,
   content,
-  tags,
+  tags = [],
+  attachments = [],
   setTitle,
   setContent,
   setTags,
   editingId,
   handleSubmit,
   handleCancelEdit,
-  user,
 }) {
   const [collaborators, setCollaborators] = useState(0);
   const [isSomeoneTyping, setIsSomeoneTyping] = useState(false);
@@ -31,183 +32,47 @@ function NoteForm({
   const [versions, setVersions] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const [messages, setMessages] = useState([]);
-  const [chatText, setChatText] = useState("");
-  const [liveCursors, setLiveCursors] = useState({});
+  const [aiPreviewResult, setAiPreviewResult] = useState("");
+  const [aiPreviewTitle, setAiPreviewTitle] = useState("AI Result");
+  const [slashLoading, setSlashLoading] = useState(false);
 
-  const typingTimeoutRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const editorWrapperRef = useRef(null);
+  const [showAIDrawer, setShowAIDrawer] = useState(false);
+  const [aiResultHistory, setAiResultHistory] = useState([]);
+  const [pinnedAIResults, setPinnedAIResults] = useState([]);
+
+  const isEditing = Boolean(editingId);
+  const isCreateMode = !isEditing;
 
   useEffect(() => {
-    if (!editingId || !user?._id) {
+    if (!editingId) {
       setCollaborators(0);
-      setIsSomeoneTyping(false);
       setShowHistory(false);
       setVersions([]);
-      setMessages([]);
-      setChatText("");
-      setLiveCursors({});
       return;
     }
 
-    setCollaborators(0);
-    setIsSomeoneTyping(false);
-    setShowHistory(false);
-    setVersions([]);
-    setMessages([]);
-    setChatText("");
-    setLiveCursors({});
+    socket.emit("join-note", editingId);
 
-    socket.emit("join-note", {
-      noteId: editingId,
-      userId: user._id,
-      userName: user.name,
-    });
+    const handleCollaborators = (count) => setCollaborators(count);
+    const handleTyping = (typing) => setIsSomeoneTyping(typing);
 
-    const fetchMessages = async () => {
-      try {
-        const res = await API.get(`/chat/${editingId}`);
-        setMessages(res.data);
-      } catch (error) {
-        console.error("Fetch chat messages error:", error);
-        toast.error("Failed to load chat messages");
-      }
-    };
-
-    fetchMessages();
-
-    const handleReceiveChanges = (newContent) => {
-      setContent(newContent);
-    };
-
-    const handleReceiveTitle = (newTitle) => {
-      setTitle(newTitle);
-    };
-
-    const handleCollaboratorsUpdate = ({ count }) => {
-      setCollaborators(count);
-    };
-
-    const handleUserTyping = () => {
-      setIsSomeoneTyping(true);
-    };
-
-    const handleUserStopTyping = () => {
-      setIsSomeoneTyping(false);
-    };
-
-    const handleReceiveMessage = (message) => {
-      setMessages((prev) => [...prev, message]);
-    };
-
-    const handleLiveCursors = (users) => {
-      const cursorMap = {};
-      users.forEach((cursor) => {
-        if (cursor.userId !== user._id) {
-          cursorMap[cursor.socketId] = cursor;
-        }
-      });
-      setLiveCursors(cursorMap);
-    };
-
-    const handleCursorUpdate = (cursor) => {
-      if (cursor.userId === user._id) return;
-      setLiveCursors((prev) => ({
-        ...prev,
-        [cursor.socketId]: cursor,
-      }));
-    };
-
-    const handleRemoveCursor = ({ socketId }) => {
-      setLiveCursors((prev) => {
-        const updated = { ...prev };
-        delete updated[socketId];
-        return updated;
-      });
-    };
-
-    socket.on("receive-changes", handleReceiveChanges);
-    socket.on("receive-title-changes", handleReceiveTitle);
-    socket.on("collaborators-update", handleCollaboratorsUpdate);
-    socket.on("user-typing", handleUserTyping);
-    socket.on("user-stop-typing", handleUserStopTyping);
-    socket.on("receive-message", handleReceiveMessage);
-    socket.on("live-cursors", handleLiveCursors);
-    socket.on("cursor-update", handleCursorUpdate);
-    socket.on("remove-cursor", handleRemoveCursor);
+    socket.on("collaborators", handleCollaborators);
+    socket.on("user-typing", handleTyping);
 
     return () => {
-      socket.off("receive-changes", handleReceiveChanges);
-      socket.off("receive-title-changes", handleReceiveTitle);
-      socket.off("collaborators-update", handleCollaboratorsUpdate);
-      socket.off("user-typing", handleUserTyping);
-      socket.off("user-stop-typing", handleUserStopTyping);
-      socket.off("receive-message", handleReceiveMessage);
-      socket.off("live-cursors", handleLiveCursors);
-      socket.off("cursor-update", handleCursorUpdate);
-      socket.off("remove-cursor", handleRemoveCursor);
-
-      clearTimeout(typingTimeoutRef.current);
-      socket.emit("stop-typing", { noteId: editingId });
+      socket.emit("leave-note", editingId);
+      socket.off("collaborators", handleCollaborators);
+      socket.off("user-typing", handleTyping);
     };
-  }, [editingId, user?._id, user?.name, setContent, setTitle]);
+  }, [editingId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleMouseMove = (e) => {
-    if (!editingId || !editorWrapperRef.current) return;
-
-    const rect = editorWrapperRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    socket.emit("cursor-move", {
-      noteId: editingId,
-      x,
-      y,
-    });
-  };
-
-  const handleContentChange = (e) => {
-    const newContent = e.target.value;
-    setContent(newContent);
-
     if (editingId) {
-      socket.emit("send-changes", {
-        noteId: editingId,
-        content: newContent,
-      });
-
-      socket.emit("typing", {
-        noteId: editingId,
-        userName: user?.name,
-      });
-
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => {
-        socket.emit("stop-typing", { noteId: editingId });
-      }, 1000);
+      fetchVersions();
+    } else {
+      setVersions([]);
     }
-  };
-
-  const handleTitleChange = (e) => {
-    const newTitle = e.target.value;
-    setTitle(newTitle);
-
-    if (editingId) {
-      socket.emit("send-title-changes", {
-        noteId: editingId,
-        title: newTitle,
-      });
-    }
-  };
-
-  const handleTagsChange = (e) => {
-    setTags(e.target.value);
-  };
+  }, [editingId]);
 
   const fetchVersions = async () => {
     if (!editingId) return;
@@ -215,267 +80,361 @@ function NoteForm({
     try {
       setLoadingHistory(true);
       const res = await API.get(`/notes/${editingId}/versions`);
-      setVersions(res.data);
-    } catch (error) {
-      console.error("Fetch versions error:", error);
-      toast.error("Failed to fetch version history");
+      setVersions(res.data || []);
+    } catch {
+      toast.error("Failed to load version history");
     } finally {
       setLoadingHistory(false);
     }
   };
 
-  const handleToggleHistory = async () => {
-    if (!showHistory && editingId) {
-      await fetchVersions();
-      toast.success("Version history loaded");
+  const pushAIHistory = (result, previewTitle) => {
+    const item = {
+      id: Date.now().toString(),
+      title: previewTitle || "AI Result",
+      result,
+      createdAt: new Date().toISOString(),
+    };
+
+    setAiResultHistory((prev) => [item, ...prev].slice(0, 12));
+  };
+
+  const handleTogglePin = () => {
+    if (!aiPreviewResult) {
+      toast.error("No AI result to pin");
+      return;
     }
-    setShowHistory((prev) => !prev);
+
+    const item = {
+      id: `${Date.now()}`,
+      title: aiPreviewTitle || "AI Result",
+      result: aiPreviewResult,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPinnedAIResults((prev) => [item, ...prev].slice(0, 10));
+    toast.success("Pinned AI result");
+  };
+
+  const handleRestoreAIHistory = (item) => {
+    setAiPreviewTitle(item.title);
+    setAiPreviewResult(item.result);
+    setShowAIDrawer(true);
+    toast.success("AI result restored");
+  };
+
+  const handleToggleHistory = async () => {
+    const next = !showHistory;
+    setShowHistory(next);
+
+    if (next && versions.length === 0) {
+      await fetchVersions();
+    }
   };
 
   const handleRestoreVersion = async (versionId) => {
     try {
-      const res = await API.put(`/notes/${editingId}/restore/${versionId}`);
+      await API.put(`/notes/${editingId}/restore/${versionId}`);
+      toast.success("Version restored");
+      await fetchVersions();
+    } catch {
+      toast.error("Failed to restore version");
+    }
+  };
 
-      setTitle(res.data.title);
-      setContent(res.data.content);
-      setTags((res.data.tags || []).join(", "));
+  const handlePreviewResult = (result, previewTitle = "AI Result") => {
+    setAiPreviewResult(result);
+    setAiPreviewTitle(previewTitle);
+    pushAIHistory(result, previewTitle);
+    setShowAIDrawer(true);
+  };
 
-      if (editingId) {
-        socket.emit("send-title-changes", {
-          noteId: editingId,
-          title: res.data.title,
-        });
+  const handleApplyPreview = (html) => {
+    setContent(html);
+    setAiPreviewResult("");
+  };
 
-        socket.emit("send-changes", {
-          noteId: editingId,
-          content: res.data.content,
-        });
+  const handleInsertPreview = (html) => {
+    setContent((prev) => `${prev || ""}<hr /><p><br /></p>${html}`);
+    setAiPreviewResult("");
+  };
+
+  const runAIAction = async (type, label) => {
+    if (!content || !content.trim()) {
+      toast.error("Write something in the note first");
+      return;
+    }
+
+    try {
+      setSlashLoading(true);
+
+      const res = await API.post("/ai/action", {
+        type,
+        content,
+      });
+
+      const result = (res.data?.result || "").trim();
+
+      if (!result) {
+        toast.error("No AI result received");
+        return;
       }
 
-      toast.success("Version restored successfully");
-      fetchVersions();
-    } catch (error) {
-      console.error("Restore version error:", error);
-      toast.error(error.response?.data?.message || "Failed to restore version");
+      if (type === "title") {
+        setTitle(result);
+        toast.success("AI title generated");
+        return;
+      }
+
+      if (type === "tags") {
+        const generatedTags = result
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .slice(0, 5);
+
+        setTags(generatedTags);
+        toast.success("AI tags generated");
+        return;
+      }
+
+      handlePreviewResult(result, `${label} Preview`);
+      toast.success(`${label} ready`);
+    } catch {
+      toast.error("AI action failed");
+    } finally {
+      setSlashLoading(false);
     }
   };
 
-  const handleSendMessage = () => {
-    if (!editingId || !user?._id) {
-      toast.error("Open a note to use chat");
-      return;
-    }
-
-    if (!chatText.trim()) {
-      toast.error("Message cannot be empty");
-      return;
-    }
-
-    socket.emit("send-message", {
-      noteId: editingId,
-      userId: user._id,
-      text: chatText.trim(),
-    });
-
-    setChatText("");
+  const handleAISlashAction = async (type, label) => {
+    await runAIAction(type, label);
   };
 
-  const handleChatKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const handleUseTemplate = (template) => {
+    setTitle(template.noteTitle);
+    setContent(template.html);
+    toast.success(`${template.title} template added`);
   };
 
-  const handleCancel = () => {
-    clearTimeout(typingTimeoutRef.current);
-
-    if (editingId) {
-      socket.emit("stop-typing", { noteId: editingId });
+  const handleInsightSuggestion = async (item) => {
+    switch (item.key) {
+      case "missing-title":
+        await runAIAction("title", "Generate Title");
+        break;
+      case "missing-tags":
+        await runAIAction("tags", "Generate Tags");
+        break;
+      case "no-headings":
+      case "too-long":
+        await runAIAction("summarize", "Summarize");
+        break;
+      case "dense-writing":
+        await runAIAction("improve", "Improve Writing");
+        break;
+      case "needs-bullets":
+        await runAIAction("bullets", "Convert to Bullets");
+        break;
+      case "too-short":
+        await runAIAction("expand", "Expand Note");
+        break;
+      default:
+        break;
     }
-
-    setCollaborators(0);
-    setIsSomeoneTyping(false);
-    setShowHistory(false);
-    setVersions([]);
-    setMessages([]);
-    setChatText("");
-    setLiveCursors({});
-    setTags("");
-
-    handleCancelEdit();
-    toast.success("Editing cancelled");
   };
 
   return (
-    <div
-      className={`grid gap-6 ${editingId ? "xl:grid-cols-[1.7fr_1fr]" : "grid-cols-1"}`}
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="rounded-[30px] border border-white/70 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.08)] sm:p-7"
-      >
-        <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-indigo-600">
-              {editingId ? "Editing mode" : "New note"}
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-              {editingId ? "Edit Note" : "Create Note"}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Write, organize, collaborate, and save everything in one workspace.
-            </p>
-          </div>
-
-          {editingId && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700">
-                <Users size={14} />
-                {collaborators} collaborator{collaborators !== 1 ? "s" : ""}
-              </span>
-
-              {isSomeoneTyping && (
-                <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                  <PencilLine size={14} />
-                  Someone is typing...
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div
-          ref={editorWrapperRef}
-          onMouseMove={handleMouseMove}
-          className="relative mt-6 space-y-4"
-        >
-          <input
-            type="text"
-            placeholder="Enter note title"
-            value={title}
-            onChange={handleTitleChange}
-            required
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base font-medium text-slate-900 outline-none transition duration-300 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
-          />
-
-          <div className="relative">
-            <Tags
-              size={16}
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="Enter tags separated by commas (example: work, urgent, project)"
-              value={tags}
-              onChange={handleTagsChange}
-              className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none transition duration-300 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
-            />
-          </div>
-
-          <textarea
-            placeholder="Write your note..."
-            value={content}
-            onChange={handleContentChange}
-            rows="10"
-            required
-            className="min-h-[280px] w-full resize-y rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-900 outline-none transition duration-300 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
-          />
-
-          {Object.values(liveCursors).map((cursor) => (
-            <div
-              key={cursor.socketId}
-              className="pointer-events-none absolute z-10"
-              style={{
-                left: `${cursor.x}px`,
-                top: `${cursor.y}px`,
-              }}
-            >
-              <div
-                className="h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm"
-                style={{ backgroundColor: cursor.color }}
+    <>
+      <div className="space-y-6">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 flex-1">
+              <input
+                type="text"
+                placeholder="Enter note title..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-2xl font-bold tracking-tight text-slate-900 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-slate-600"
               />
-              <div
-                className="mt-1 inline-block rounded-md px-2 py-1 text-[11px] font-semibold text-white shadow-sm"
-                style={{ backgroundColor: cursor.color }}
-              >
-                {cursor.userName}
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+                {isEditing && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium dark:bg-slate-800">
+                    {collaborators} collaborator{collaborators !== 1 ? "s" : ""} online
+                  </span>
+                )}
+
+                {isSomeoneTyping && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium dark:bg-slate-800">
+                    Someone is typing...
+                  </span>
+                )}
+
+                {slashLoading && (
+                  <span className="rounded-full bg-slate-900 px-3 py-1.5 font-medium text-white dark:bg-white dark:text-slate-900">
+                    AI is working...
+                  </span>
+                )}
+
+                <span className="rounded-full bg-slate-100 px-3 py-1.5 font-medium dark:bg-slate-800">
+                  {content.replace(/<[^>]*>/g, "").trim().length} chars
+                </span>
               </div>
             </div>
-          ))}
-        </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(79,70,229,0.28)] transition duration-300 hover:scale-[1.02]"
-          >
-            <Save size={16} />
-            {editingId ? "Update Note" : "Add Note"}
-          </button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleToggleHistory}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  {showHistory ? "Hide History" : "Show History"}
+                </button>
+              )}
 
-          {editingId && (
-            <>
               <button
                 type="button"
-                onClick={handleCancel}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition duration-300 hover:bg-slate-50"
+                onClick={handleCancelEdit}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
-                <X size={16} />
                 Cancel
               </button>
 
               <button
                 type="button"
-                onClick={handleToggleHistory}
-                className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3 text-sm font-semibold text-violet-700 transition duration-300 hover:bg-violet-100"
+                onClick={handleSubmit}
+                className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-900"
               >
-                <History size={16} />
-                {showHistory ? "Hide History" : "View History"}
+                {isEditing ? "Update Note" : "Create Note"}
               </button>
-            </>
+            </div>
+          </div>
+        </div>
+
+        {isCreateMode && !content?.trim() && (
+          <AITemplateCards onUseTemplate={handleUseTemplate} />
+        )}
+
+        <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <NoteEditor
+            value={content}
+            onChange={setContent}
+            onAIMenuAction={handleAISlashAction}
+          />
+        </div>
+
+        {aiPreviewResult && (
+          <AIResultPreview
+            result={aiPreviewResult}
+            title={aiPreviewTitle}
+            onApply={handleApplyPreview}
+            onInsert={handleInsertPreview}
+            onClose={() => setAiPreviewResult("")}
+          />
+        )}
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                AI Workspace
+              </h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Use AI to improve, summarize, organize, and refine this note.
+              </p>
+            </div>
+
+            <AIAssistant
+              content={content}
+              setContent={setContent}
+              setTitle={setTitle}
+            />
+          </div>
+
+          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <AISmartBar
+              title={title}
+              content={content}
+              tags={tags}
+              setTitle={setTitle}
+              setTags={setTags}
+              onPreviewResult={handlePreviewResult}
+            />
+          </div>
+
+          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <AIMetadataBar title={title} tags={tags} />
+          </div>
+
+          {isEditing && (
+            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <AISmartActionsPanel
+                content={content}
+                onPreviewResult={handlePreviewResult}
+              />
+            </div>
+          )}
+
+          {isEditing && (
+            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <NoteInsightsPanel
+                title={title}
+                content={content}
+                tags={tags}
+                attachments={attachments}
+                onSuggestionAction={handleInsightSuggestion}
+              />
+            </div>
+          )}
+
+          {isEditing && (
+            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <AICollaborationPanel
+                content={content}
+                versions={versions}
+                onPreviewResult={handlePreviewResult}
+              />
+            </div>
           )}
         </div>
 
-        {showHistory && (
-          <div className="mt-6 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <History size={18} className="text-violet-600" />
-              <h3 className="text-lg font-semibold text-slate-900">
-                Version History
-              </h3>
-            </div>
+        {showHistory && isEditing && (
+          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
+              Version History
+            </h3>
 
             {loadingHistory ? (
-              <p className="text-sm text-slate-500">Loading history...</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Loading history...
+              </p>
             ) : versions.length === 0 ? (
-              <p className="text-sm text-slate-500">No versions found.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                No versions found.
+              </p>
             ) : (
               <div className="space-y-3">
                 {versions.map((version) => (
                   <div
                     key={version._id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800 lg:flex-row lg:items-center lg:justify-between"
                   >
-                    <p className="text-sm text-slate-700">
-                      <strong>Title:</strong> {version.title}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-700">
-                      <strong>Tags:</strong>{" "}
-                      {version.tags?.length ? version.tags.join(", ") : "No tags"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-700">
-                      <strong>Content:</strong> {version.content}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      <strong>Saved At:</strong>{" "}
-                      {new Date(version.editedAt).toLocaleString()}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 dark:text-white">
+                        {version.title || "Untitled Version"}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {new Date(
+                          version.editedAt || version.savedAt || Date.now(),
+                        ).toLocaleString()}
+                      </p>
+                    </div>
 
                     <button
                       type="button"
                       onClick={() => handleRestoreVersion(version._id)}
-                      className="mt-3 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       Restore
                     </button>
@@ -485,74 +444,28 @@ function NoteForm({
             )}
           </div>
         )}
-      </form>
+      </div>
 
-      {editingId && (
-        <div className="rounded-[30px] border border-white/70 bg-white p-6 shadow-[0_14px_40px_rgba(15,23,42,0.08)]">
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-4">
-            <MessageSquare size={18} className="text-indigo-600" />
-            <h3 className="text-xl font-semibold text-slate-950">Note Chat</h3>
-          </div>
+      <div className="fixed bottom-6 right-6 z-[70]">
+        <AIFloatingButton onClick={() => setShowAIDrawer(true)} />
+      </div>
 
-          <div className="mt-4 flex h-[420px] flex-col rounded-[24px] border border-slate-200 bg-slate-50 p-3">
-            <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-              {messages.length === 0 ? (
-                <p className="pt-10 text-center text-sm text-slate-500">
-                  No messages yet
-                </p>
-              ) : (
-                messages.map((msg) => {
-                  const senderId =
-                    typeof msg.sender === "object" ? msg.sender?._id : msg.sender;
-
-                  const isOwn = senderId === user?._id;
-
-                  return (
-                    <div
-                      key={msg._id}
-                      className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                        isOwn
-                          ? "ml-auto bg-indigo-100 text-slate-900"
-                          : "bg-white text-slate-900"
-                      }`}
-                    >
-                      <div className="mb-1 text-xs font-semibold text-slate-600">
-                        {msg.senderName}
-                      </div>
-                      <div className="leading-6">{msg.text}</div>
-                      <small className="mt-2 block text-[11px] text-slate-400">
-                        {new Date(msg.createdAt).toLocaleTimeString()}
-                      </small>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <input
-                type="text"
-                placeholder="Type a message..."
-                value={chatText}
-                onChange={(e) => setChatText(e.target.value)}
-                onKeyDown={handleChatKeyDown}
-                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition duration-300 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
-              />
-
-              <button
-                type="button"
-                onClick={handleSendMessage}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-              >
-                <Send size={16} />
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <AIDrawer
+        open={showAIDrawer}
+        onClose={() => setShowAIDrawer(false)}
+        result={aiPreviewResult}
+        resultTitle={aiPreviewTitle}
+        resultHistory={aiResultHistory}
+        pinnedResults={pinnedAIResults}
+        onApply={handleApplyPreview}
+        onInsert={handleInsertPreview}
+        onRestoreHistory={handleRestoreAIHistory}
+        onTogglePin={handleTogglePin}
+        editingId={editingId}
+        noteTitle={title}
+        fetchVersions={fetchVersions}
+      />
+    </>
   );
 }
 

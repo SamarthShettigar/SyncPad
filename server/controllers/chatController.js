@@ -13,7 +13,9 @@ const getChatMessages = async (req, res) => {
     }
 
     const isOwner = note.owner.toString() === userId;
-    const isSharedUser = note.sharedWith.some((id) => id.toString() === userId);
+    const isSharedUser = (note.sharedWith || []).some(
+      (id) => id.toString() === userId,
+    );
 
     if (!isOwner && !isSharedUser) {
       return res.status(403).json({ message: "Access denied" });

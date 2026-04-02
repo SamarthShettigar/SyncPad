@@ -2,11 +2,11 @@ const http = require("http");
 const dotenv = require("dotenv");
 const { Server } = require("socket.io");
 
+dotenv.config();
+
 const connectDB = require("./config/db");
 const app = require("./app");
 const setupSocket = require("./sockets/socketHandler");
-
-dotenv.config();
 
 connectDB();
 

@@ -28,7 +28,24 @@ const setupSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
+    // =========================
+    // REGISTER USER ROOM
+    // =========================
+    socket.on("register-user", (userId) => {
+      if (!userId) return;
+
+      socket.join(`user:${userId}`);
+      socket.registeredUserId = userId;
+
+      console.log(`User ${userId} joined room user:${userId}`);
+    });
+
+    // =========================
+    // NOTE ROOM JOIN
+    // =========================
     socket.on("join-note", ({ noteId, userId, userName }) => {
+      if (!noteId || !userId || !userName) return;
+
       socket.join(noteId);
 
       socket.noteId = noteId;
@@ -43,6 +60,8 @@ const setupSocket = (io) => {
         userId,
         userName,
         color: getUserColor(userId),
+        x: 0,
+        y: 0,
       };
 
       io.to(noteId).emit("collaborators-update", {
@@ -56,30 +75,48 @@ const setupSocket = (io) => {
           userId: user.userId,
           userName: user.userName,
           color: user.color,
-          x: 0,
-          y: 0,
+          x: user.x,
+          y: user.y,
         })),
       );
     });
 
+    // =========================
+    // CONTENT CHANGES
+    // =========================
     socket.on("send-changes", ({ noteId, content }) => {
+      if (!noteId) return;
       socket.to(noteId).emit("receive-changes", content);
     });
 
     socket.on("send-title-changes", ({ noteId, title }) => {
+      if (!noteId) return;
       socket.to(noteId).emit("receive-title-changes", title);
     });
 
+    // =========================
+    // TYPING
+    // =========================
     socket.on("typing", ({ noteId, userName }) => {
+      if (!noteId) return;
       socket.to(noteId).emit("user-typing", { userName });
     });
 
     socket.on("stop-typing", ({ noteId }) => {
+      if (!noteId) return;
       socket.to(noteId).emit("user-stop-typing");
     });
 
+    // =========================
+    // LIVE CURSOR
+    // =========================
     socket.on("cursor-move", ({ noteId, x, y }) => {
-      if (!noteUsers[noteId] || !noteUsers[noteId][socket.id]) return;
+      if (!noteId || !noteUsers[noteId] || !noteUsers[noteId][socket.id]) {
+        return;
+      }
+
+      noteUsers[noteId][socket.id].x = x;
+      noteUsers[noteId][socket.id].y = y;
 
       const user = noteUsers[noteId][socket.id];
 
@@ -93,11 +130,16 @@ const setupSocket = (io) => {
       });
     });
 
+    // =========================
+    // CHAT MESSAGE
+    // =========================
     socket.on("send-message", async ({ noteId, userId, text }) => {
       try {
-        if (!text || !text.trim()) return;
+        if (!noteId || !userId || !text || !text.trim()) return;
 
-        const note = await Note.findById(noteId);
+        const note = await Note.findById(noteId).select(
+          "owner sharedWith title",
+        );
         if (!note) return;
 
         const isOwner = note.owner.toString() === userId;
@@ -117,27 +159,32 @@ const setupSocket = (io) => {
           text: text.trim(),
         });
 
-        const recipients = [];
+        const recipientIds = new Set();
 
         if (note.owner.toString() !== userId) {
-          recipients.push(note.owner.toString());
+          recipientIds.add(note.owner.toString());
         }
 
         (note.sharedWith || []).forEach((sharedUserId) => {
           if (sharedUserId.toString() !== userId) {
-            recipients.push(sharedUserId.toString());
+            recipientIds.add(sharedUserId.toString());
           }
         });
 
-        for (const recipientId of recipients) {
-          await createNotification({
-            recipient: recipientId,
-            sender: userId,
-            senderName: user.name,
-            note: noteId,
-            type: "chat",
-            message: `${user.name} sent a message in "${note.title}"`,
-          });
+        if (recipientIds.size > 0) {
+          await Promise.all(
+            [...recipientIds].map((recipientId) =>
+              createNotification({
+                io,
+                recipient: recipientId,
+                sender: userId,
+                senderName: user.name,
+                note: noteId,
+                type: "chat",
+                message: `${user.name} sent a message in "${note.title}"`,
+              }),
+            ),
+          );
         }
 
         io.to(noteId).emit("receive-message", {
@@ -153,6 +200,9 @@ const setupSocket = (io) => {
       }
     });
 
+    // =========================
+    // DISCONNECT
+    // =========================
     socket.on("disconnect", () => {
       const noteId = socket.noteId;
 
@@ -164,6 +214,18 @@ const setupSocket = (io) => {
         io.to(noteId).emit("collaborators-update", {
           count: Object.keys(noteUsers[noteId]).length,
         });
+
+        io.to(noteId).emit(
+          "live-cursors",
+          Object.entries(noteUsers[noteId]).map(([socketId, user]) => ({
+            socketId,
+            userId: user.userId,
+            userName: user.userName,
+            color: user.color,
+            x: user.x,
+            y: user.y,
+          })),
+        );
 
         if (Object.keys(noteUsers[noteId]).length === 0) {
           delete noteUsers[noteId];

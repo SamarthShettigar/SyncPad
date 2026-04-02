@@ -3,16 +3,17 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
+import Notifications from "./pages/Notifications";
+import NotificationSettings from "./pages/NotificationSettings";
+import NoteReader from "./pages/NoteReader";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
     <Routes>
-      {/* Public */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Protected */}
       <Route
         path="/"
         element={
@@ -36,6 +37,15 @@ function App() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/notes/:id"
+        element={
+          <ProtectedRoute>
+            <NoteReader />
           </ProtectedRoute>
         }
       />
@@ -71,7 +81,16 @@ function App() {
         path="/notifications"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <Notifications />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/notification-settings"
+        element={
+          <ProtectedRoute>
+            <NotificationSettings />
           </ProtectedRoute>
         }
       />

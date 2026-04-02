@@ -1,6 +1,7 @@
 const Notification = require("../models/Notification");
 
 const createNotification = async ({
+  io = null,
   user,
   recipient,
   sender = null,
@@ -23,7 +24,18 @@ const createNotification = async ({
       message,
     });
 
-    return notification;
+    const populatedNotification = await Notification.findById(notification._id)
+      .populate("sender", "name email")
+      .populate("note", "title");
+
+    if (io) {
+      io.to(`user:${targetUser.toString()}`).emit(
+        "notification:new",
+        populatedNotification,
+      );
+    }
+
+    return populatedNotification;
   } catch (error) {
     console.error("Create notification error:", error.message);
     return null;

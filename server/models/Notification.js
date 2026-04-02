@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const notificationSchema = new mongoose.Schema(
   {
-    user: {
+    recipient: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -10,17 +10,24 @@ const notificationSchema = new mongoose.Schema(
     sender: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null,
+    },
+    senderName: {
+      type: String,
+      default: "",
     },
     note: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Note",
-      default: null,
     },
     type: {
       type: String,
       enum: ["share", "update", "chat"],
       required: true,
+    },
+    priority: {
+      type: String,
+      enum: ["high", "normal"],
+      default: "normal",
     },
     message: {
       type: String,
@@ -28,6 +35,10 @@ const notificationSchema = new mongoose.Schema(
       trim: true,
     },
     isRead: {
+      type: Boolean,
+      default: false,
+    },
+    isArchived: {
       type: Boolean,
       default: false,
     },
